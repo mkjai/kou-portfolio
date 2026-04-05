@@ -11,14 +11,13 @@ onMounted(() => {
     let pg
     let pixels = []
 
-    // Diagonal sweep starts at a negative value
-    // It will travel from 0 up to (width + height)
-    let lightPos = -1000
+    // 1. INSTANT START:
+    // Since min diagPos (x+y) is 0, starting at -300 ensures the
+    // sparkle hits the top-left corner immediately.
+    let lightPos = -300
 
-    // ADJUST SPEED: Since diagonal distance is longer,
-    // we bump this slightly to keep the timing tight.
-    let sweepSpeed = 6
-    let ditherTail = 1000
+    let sweepSpeed = 8 // Slightly faster for large screens
+    let ditherTail = 1200
     let isFinished = false
 
     p.setup = () => {
@@ -30,28 +29,39 @@ onMounted(() => {
       pg.background(255)
       pg.fill(0)
       pg.textAlign(p.CENTER, p.CENTER)
-
-      let fontSize = p.windowWidth > 800 ? 380 : 180
-      pg.textSize(fontSize)
       pg.textStyle(p.BOLD)
 
-      pg.text('KOU', pg.width / 2, pg.height / 2)
+      // 2. EXTREME BRUTALIST STRETCHING
+      // We force the text to ignore its aspect ratio to fill the entire box
+      let baseSize = 100
+      pg.textSize(baseSize)
+      let tw = pg.textWidth('KOU')
+      let th = baseSize * 0.75 // Approximate cap height
+
+      pg.push()
+      pg.translate(p.width / 2, p.height / 2)
+      // Scale X to fill width, Scale Y to fill height (Full Bleed)
+      pg.scale(p.width / tw, p.height / th)
+      pg.text('KOU', 0, 0)
+      pg.pop()
+
       pg.loadPixels()
 
-      let spacing = p.windowWidth > 800 ? 3 : 2.5
+      // 3. DYNAMIC SPACING
+      // We adjust spacing based on screen size to keep performance smooth
+      // while maintaining the high-density grain look.
+      let spacing = p.map(p.width, 400, 2500, 2.5, 5)
 
       for (let x = 0; x < p.width; x += spacing) {
         for (let y = 0; y < p.height; y += spacing) {
-          let index = (x + y * pg.width) * 4
+          let index = (p.floor(x) + p.floor(y) * pg.width) * 4
 
-          if (pg.pixels[index] < 128 && p.random() > 0.15) {
+          if (pg.pixels[index] < 128 && p.random() > 0.12) {
             pixels.push({
               x: x,
               y: y,
-              size: p.random(1, 2.2),
-              // Diagonal light logic uses (x + y)
+              size: p.random(1.2, 3.0), // Slightly larger pixels for more grit
               diagPos: x + y,
-              // Keeps the edges jagged and "sparkly"
               noiseOffset: p.random(-150, 150),
             })
           }
@@ -66,8 +76,7 @@ onMounted(() => {
       let allGone = true
 
       for (let px of pixels) {
-        // DIAGONAL LOGIC:
-        // We compare the light position to the sum of x and y
+        // YOUR ORIGINAL LOGIC
         let distance = lightPos - (px.diagPos + px.noiseOffset)
 
         if (distance > 0) {
@@ -85,7 +94,6 @@ onMounted(() => {
         }
       }
 
-      // Exit logic: lightPos must exceed width + height + the noise/tail buffer
       if (lightPos > p.width + p.height + 600 && allGone && !isFinished) {
         isFinished = true
         p.noLoop()
@@ -119,7 +127,7 @@ onBeforeUnmount(() => {
   left: 0;
   width: 100vw;
   height: 100vh;
-  z-index: 50;
+  z-index: 100; /* Ensure it covers everything */
   pointer-events: none;
 }
 .p5-canvas {
