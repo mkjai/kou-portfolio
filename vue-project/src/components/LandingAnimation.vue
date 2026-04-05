@@ -5,6 +5,10 @@ import p5 from 'p5'
 const emit = defineEmits(['complete'])
 const p5Container = ref(null)
 let myP5 = null
+let resizeObserver = null
+
+// These are set from inside the sketch so ResizeObserver can call them directly
+let _resize = null
 
 onMounted(() => {
   const sketch = (p) => {
@@ -12,48 +16,54 @@ onMounted(() => {
     let pixels = []
 
     let sweepPos = -600
-    let sweepSpeed = 10
-    let transitionWidth = 900
-    let fadeGap = 500
+    const sweepSpeed = 10
+    const transitionWidth = 900
+    const fadeGap = 500
     let isFinished = false
 
-    // helper to generate mask based on current dimensions
     const createMask = () => {
+      if (pg) pg.remove()
       pg = p.createGraphics(p.width, p.height)
       pg.pixelDensity(1)
       pg.background(255)
       pg.fill(0)
       pg.textAlign(p.CENTER, p.CENTER)
       pg.textStyle(p.BOLD)
+      pg.textSize(100)
 
-      let baseSize = 100
-      pg.textSize(baseSize)
-      let tw = pg.textWidth('KOU')
-      let th = pg.textAscent() + pg.textDescent()
+      const tw = pg.textWidth('KOU')
+      const ascent = pg.textAscent()
+      const descent = pg.textDescent()
+      const th = ascent + descent
+
+      const hScale = (p.width * 1.05) / tw
+      const vScale = (p.height * 1.05) / th
+
+      // Use LEFT/TOP so we control exact position — CENTER alignment
+      // has inconsistent offsets when scaled non-uniformly
+      pg.textAlign(p.LEFT, p.TOP)
+
+      // After scaling, rendered size = tw*hScale x th*vScale
+      // Offset so it's perfectly centered on both axes
+      const drawX = (p.width - tw * hScale) / 2
+      const drawY = (p.height - th * vScale) / 2
 
       pg.push()
-      pg.translate(p.width / 2, p.height / 2)
-      // height stretch
-      pg.scale(p.width / tw, (p.height * 1.1) / th)
+      pg.translate(drawX, drawY)
+      pg.scale(hScale, vScale)
       pg.text('KOU', 0, 0)
       pg.pop()
       pg.loadPixels()
     }
 
-    p.setup = () => {
-      p.createCanvas(p.windowWidth, p.windowHeight)
-      p.pixelDensity(1)
-      createMask()
-
-      let spacing = p.width > 800 ? 2.2 : 2.0
-
+    const generatePixels = () => {
+      pixels = []
+      const spacing = 2.2
       for (let x = 0; x < p.width; x += spacing) {
         for (let y = 0; y < p.height; y += spacing) {
-          let index = (p.floor(x) + p.floor(y) * pg.width) * 4
-
-          if (pg.pixels[index] < 128) {
+          const idx = (Math.floor(x) + Math.floor(y) * pg.width) * 4
+          if (pg.pixels[idx] < 128) {
             pixels.push({
-              // store coordinates as percentages (0-1)
               nx: x / p.width,
               ny: y / p.height,
               baseSize: p.random(1.5, 2.8),
@@ -64,36 +74,44 @@ onMounted(() => {
       }
     }
 
+    // Expose to outer scope so ResizeObserver can call it
+    _resize = (w, h) => {
+      p.resizeCanvas(w, h)
+      createMask()
+      generatePixels()
+    }
+
+    p.setup = () => {
+      const el = p5Container.value
+      p.createCanvas(el.clientWidth, el.clientHeight)
+      p.pixelDensity(1)
+      createMask()
+      generatePixels()
+    }
+
     p.draw = () => {
       p.clear()
       sweepPos += sweepSpeed
       let anyVisible = false
-      let frameShimmer = p.frameCount * 0.035
+      const frameShimmer = p.frameCount * 0.035
 
       for (let i = 0; i < pixels.length; i++) {
-        let px = pixels[i]
+        const px = pixels[i]
+        const curX = px.nx * p.width
+        const curY = px.ny * p.height
+        const curDiag = curX + curY
 
-        // map normalized coordinates back to actual screen pixels
-        let curX = px.nx * p.width
-        let curY = px.ny * p.height
-        let curDiag = curX + curY
+        const distIn = sweepPos - curDiag
+        if (distIn < -100 || distIn > transitionWidth + fadeGap + transitionWidth + 100) continue
 
-        // performance related, make it less resource taking
-        let distIn = sweepPos - curDiag
-        if (distIn < -100 || distIn > transitionWidth + fadeGap + transitionWidth + 100) {
-          continue
-        }
-
-        let probIn = p.constrain(p.map(distIn, 0, transitionWidth, 0, 1), 0, 1)
-        let distOut = sweepPos - (curDiag + fadeGap + transitionWidth)
-        let probOut = p.constrain(p.map(distOut, 0, transitionWidth, 0, 1), 0, 1)
-
-        let targetIntensity = probIn - probOut
+        const probIn = p.constrain(p.map(distIn, 0, transitionWidth, 0, 1), 0, 1)
+        const distOut = sweepPos - (curDiag + fadeGap + transitionWidth)
+        const probOut = p.constrain(p.map(distOut, 0, transitionWidth, 0, 1), 0, 1)
+        const targetIntensity = probIn - probOut
 
         if (targetIntensity > 0.01) {
-          let shine = p.sin(curDiag * 0.02 - frameShimmer)
-          let specular = p.pow(p.map(shine, -1, 1, 0, 1), 4)
-
+          const shine = p.sin(curDiag * 0.02 - frameShimmer)
+          const specular = p.pow(p.map(shine, -1, 1, 0, 1), 4)
           if (px.stableRand < targetIntensity * (0.15 + specular * 0.85)) {
             anyVisible = true
             p.noStroke()
@@ -113,20 +131,23 @@ onMounted(() => {
         emit('complete')
       }
     }
-
-    p.windowResized = () => {
-      p.resizeCanvas(p.windowWidth, p.windowHeight)
-      // don't need to re-generate pixels array?
-      // need to re-calculate the mask boundaries to stay clean
-      createMask()
-    }
   }
 
   myP5 = new p5(sketch, p5Container.value)
+
+  // Instantly react to any container size change
+  resizeObserver = new ResizeObserver((entries) => {
+    const { width, height } = entries[0].contentRect
+    if (_resize && width > 0 && height > 0) {
+      _resize(Math.floor(width), Math.floor(height))
+    }
+  })
+  resizeObserver.observe(p5Container.value)
 })
 
 onBeforeUnmount(() => {
-  if (myP5) myP5.remove()
+  resizeObserver?.disconnect()
+  myP5?.remove()
 })
 </script>
 
@@ -139,15 +160,29 @@ onBeforeUnmount(() => {
 <style scoped>
 .landing-wrapper {
   position: fixed;
-  top: 0;
-  left: 0;
-  width: 100vw;
-  height: 100vh;
+  inset: 0;
   z-index: 999;
   pointer-events: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
+
+/*
+  Control the canvas size here with CSS.
+  100vw / 100vh = full brutalist bleed.
+  You can also use e.g. 90vw / 80vh for breathing room.
+*/
 .p5-canvas {
-  width: 100%;
-  height: 100%;
+  width: 100vw;
+  height: 100vh;
+  padding-right: 0.5rem;
+}
+
+/* Stretch the p5 <canvas> element to fill the container */
+.p5-canvas :deep(canvas) {
+  display: block;
+  width: 100% !important;
+  height: 100% !important;
 }
 </style>

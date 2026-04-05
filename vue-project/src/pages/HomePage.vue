@@ -27,7 +27,7 @@ const revealPortfolio = () => {
 </template>
 
 <style scoped>
-.home-wrapper {
+/* .home-wrapper {
   position: relative;
   min-height: 100vh;
 }
@@ -35,7 +35,7 @@ const revealPortfolio = () => {
 .portfolio-content {
   padding: 40px;
   color: #333;
-}
+} */
 
 /* --- VUE TRANSITION CSS --- */
 
