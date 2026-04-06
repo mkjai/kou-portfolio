@@ -62,7 +62,7 @@ onMounted(async () => {
 
     const generatePixels = () => {
       pixels = []
-      const spacing = 3
+      const spacing = 2
       for (let x = 0; x < p.width; x += spacing) {
         for (let y = 0; y < p.height; y += spacing) {
           const idx = (Math.floor(x) + Math.floor(y) * pg.width) * 4
