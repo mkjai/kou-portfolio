@@ -9,59 +9,34 @@ let logoP5 = null
 
 onMounted(() => {
   const sketch = (p) => {
-    const size = 32 // Circle size
-    const grid = 8
-    const pSize = size / grid
-
-    let timer = 0
-    let step = 1
-    let ringProgress = 4
+    const size = 32 // Size of the square logo
 
     p.setup = () => {
       p.createCanvas(size, size)
       p.noStroke()
-      p.frameRate(12)
+      // We keep the frameRate high for active, energetic grain movement
+      p.frameRate(30)
+      p.pixelDensity(1)
     }
 
     p.draw = () => {
       p.clear()
-      p.fill(0)
 
-      timer++
-      if (timer % 4 === 0) {
-        if (step === 1) {
-          ringProgress = 4
-          step = 2
-        } else if (step === 2) {
-          step = 3
-        } else if (step === 3) {
-          ringProgress--
-          if (ringProgress <= 0) step = 4
-        } else if (step === 4) {
-          ringProgress = 1
-          step = 5
-        } else if (step === 5) {
-          ringProgress++
-          if (ringProgress >= 4) step = 1
-        }
-      }
+      // We draw the grain fresh every frame to create movement
+      // Increase the loop count (e.g., 800) for higher density
+      for (let i = 0; i < 700; i++) {
+        const x = p.random(0, size)
+        const y = p.random(0, size)
 
-      for (let x = 0; x < grid; x++) {
-        for (let y = 0; y < grid; y++) {
-          const dx = x - 3.5
-          const dy = y - 3.5
-          const dist = p.sqrt(dx * dx + dy * dy)
+        // Randomize size slightly for texture
+        const w = p.random(0.5, 1.5)
 
-          if (step === 2 || step === 3) {
-            if (dist <= 4 && dist >= 4 - ringProgress) {
-              p.rect(x * pSize, y * pSize, pSize, pSize)
-            }
-          } else {
-            if (dist <= ringProgress) {
-              p.rect(x * pSize, y * pSize, pSize, pSize)
-            }
-          }
-        }
+        // Darkest grains are pure #000
+        // Varying alpha creates the "shuffling" noise effect
+        const alpha = p.random(250, 255)
+
+        p.fill(0, alpha)
+        p.rect(x, y, w, w)
       }
     }
   }
@@ -83,10 +58,10 @@ onBeforeUnmount(() => {
       <RouterLink to="/" class="nav-link" :class="{ active: route.path === '/' }">
         Home
       </RouterLink>
-      <RouterLink to="/stills" class="nav-link" :class="{ active: route.path === '/stills' }">
+      <RouterLink to="/still" class="nav-link" :class="{ active: route.path === '/still' }">
         Stills
       </RouterLink>
-      <RouterLink to="/motions" class="nav-link" :class="{ active: route.path === '/motions' }">
+      <RouterLink to="/motion" class="nav-link" :class="{ active: route.path === '/motion' }">
         Motions
       </RouterLink>
     </div>
@@ -103,7 +78,7 @@ onBeforeUnmount(() => {
   display: flex;
   flex-direction: row;
   justify-content: space-between;
-  /* CRITICAL: Centers everything vertically by their height */
+  /* Keeps the links and square logo aligned in a straight line */
   align-items: center;
 }
 
@@ -118,17 +93,17 @@ onBeforeUnmount(() => {
   width: 32px;
   height: 32px;
   display: block;
+  /* Optional: Ensures the square edges look sharp against the background */
+  background-color: transparent;
 }
 
 .nav-links-container {
   display: flex;
   flex-direction: row;
-  gap: 1rem;
-  /* Vertical center within the group */
+  gap: 2rem;
   align-items: center;
 }
 
-/* NO CHANGES TO YOUR ORIGINAL LINK STYLES EXCEPT ALIGNMENT */
 .nav-link {
   font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
   font-size: 1.15rem;
@@ -136,7 +111,6 @@ onBeforeUnmount(() => {
   letter-spacing: -0.01em;
   text-decoration: none;
   color: #000;
-  /* Line-height 1 helps with precise centering */
   line-height: 1;
   display: inline-block;
 }
