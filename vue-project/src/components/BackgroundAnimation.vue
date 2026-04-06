@@ -60,17 +60,17 @@ onMounted(() => {
       uv.y = 1.0 - uv.y;
 
       float aspect = u_resolution.x / u_resolution.y;
-      vec2 centered = (uv - 0.5) * vec2(aspect, 1.0);
+      vec2 centered = (uv - vec2(0.30, 0.70)) * vec2(aspect, 1.0);
 
       // ---- Tile grid ----
       // Tile size relative to viewport height so it stays consistent on all screens.
       // 22 tiles across the height → circle ~70% of min(w,h) feels right with circleR=0.70
-      float gridCount = 30.0;
+      float gridCount = 40.0;
       float tileSize  = 1.0 / gridCount;
 
       // Circle radius in aspect-corrected space.
       // 0.35 * aspect fills ~70% of the viewport height as a circle.
-      float circleR = 0.75;
+      float circleR = 0.80;
 
       vec2 tileIdx = floor(uv / tileSize);
 
@@ -82,11 +82,25 @@ onMounted(() => {
         return;
       }
 
-      // ---- Sample wave at TILE CENTRE ----
-      float t = u_time * 0.20;
-      vec2 tileCenWorld = tileCenCen * 2.2;
-      float density = fbm(tileCenWorld + vec2(t * 0.5, t * 0.3));
+      // ---- Outward-radiating wave from circle centre ----
+      float t = u_time * 0.30;
+
+      // Normalised distance from centre (0=centre, 1=edge)
+      float dist = length(tileCenCen) / circleR;
+
+      // Angle adds organic wobble so waves aren't perfect rings
+      float angle = atan(tileCenCen.y, tileCenCen.x);
+
+      // Polar coords fed into fbm:
+      // subtracting t on the radial axis makes waves travel outward
+      // Use cos/sin instead of raw angle — eliminates the atan seam discontinuity
+      vec2 polarCoords = vec2(
+        dist * 4.5 - t * 0.9,
+        cos(angle) * 0.5 + sin(angle) * 0.3 + t * 0.15
+      );
+      float density = fbm(polarCoords);
       density = smoothstep(0.15, 0.85, density);
+      density *= 0.60;
 
       // ---- Fine pixel grain — uniform within each tile ----
       float pixelRand = hash(floor(gl_FragCoord.xy));
@@ -95,7 +109,7 @@ onMounted(() => {
         return;
       }
 
-      float brightness = mix(0.70, 0.16, density);
+      float brightness = mix(0.85, 0.20, density);
       gl_FragColor = vec4(vec3(brightness), 1.0);
     }
   `

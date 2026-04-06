@@ -2,13 +2,13 @@
 import { ref, provide } from 'vue'
 import LandingAnimation from '@/components/LandingAnimation.vue'
 import BackgroundAnimation from '@/components/BackgroundAnimation.vue'
+import NavBar from '@/components/NavBar.vue'
 
 const landingDone = ref(false)
 const landingRemoved = ref(false)
 const pageVisible = ref(false)
 const bgVisible = ref(false)
 
-// Pages can read pageVisible if needed
 provide('pageVisible', pageVisible)
 
 const onLandingComplete = () => {
@@ -17,6 +17,7 @@ const onLandingComplete = () => {
     landingRemoved.value = true
     requestAnimationFrame(() => {
       requestAnimationFrame(() => {
+        // All three flip at the exact same time
         pageVisible.value = true
         bgVisible.value = true
       })
@@ -26,18 +27,23 @@ const onLandingComplete = () => {
 </script>
 
 <template>
-  <!-- KOU landing — only mounts once at app startup, never again -->
+  <!-- KOU landing -->
   <div v-if="!landingRemoved" class="landing-layer" :class="{ 'landing-fade-out': landingDone }">
     <LandingAnimation @complete="onLandingComplete" />
   </div>
 
-  <!-- Background — permanent, never remounts on navigation -->
-  <div class="bg-fade" :class="{ 'bg-visible': bgVisible }">
+  <!-- Background -->
+  <div class="bg-fade" :class="{ visible: bgVisible }">
     <BackgroundAnimation />
   </div>
 
-  <!-- Page content fades in after landing, persists across route changes -->
-  <div class="page-fade" :class="{ 'page-visible': pageVisible }">
+  <!-- NavBar: same fade class/timing as bg and page -->
+  <div class="nav-fade" :class="{ visible: pageVisible }">
+    <NavBar />
+  </div>
+
+  <!-- Page content -->
+  <div class="page-fade" :class="{ visible: pageVisible }">
     <RouterView />
   </div>
 </template>
@@ -51,9 +57,21 @@ const onLandingComplete = () => {
   opacity: 1;
   transition: opacity 0.5s ease;
 }
-
 .landing-layer.landing-fade-out {
   opacity: 0;
+}
+
+/* All three share the same fade timing */
+.bg-fade,
+.nav-fade,
+.page-fade {
+  opacity: 0;
+  transition: opacity 0.6s ease;
+}
+.bg-fade.visible,
+.nav-fade.visible,
+.page-fade.visible {
+  opacity: 1;
 }
 
 .bg-fade {
@@ -61,23 +79,18 @@ const onLandingComplete = () => {
   inset: 0;
   z-index: 0;
   pointer-events: none;
-  opacity: 0;
-  transition: opacity 0.6s ease;
 }
 
-.bg-fade.bg-visible {
-  opacity: 1;
+.nav-fade {
+  position: fixed;
+  top: 0;
+  right: 0;
+  z-index: 100;
 }
 
 .page-fade {
-  opacity: 0;
-  transition: opacity 0.6s ease;
   position: relative;
   z-index: 1;
-}
-
-.page-fade.page-visible {
-  opacity: 1;
 }
 </style>
 
