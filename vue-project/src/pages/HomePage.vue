@@ -65,8 +65,6 @@ onBeforeUnmount(() => clearInterval(clockInterval))
 <template>
   <div class="home">
     <div class="left-col">
-      <div class="circle"></div>
-
       <p class="text">Kou</p>
 
       <p class="text bio small">
@@ -89,7 +87,8 @@ onBeforeUnmount(() => clearInterval(clockInterval))
       </p>
 
       <div class="contact">
-        <p class="text dim small">Contact</p>
+        <p class="text small">Contact</p>
+        <br />
         <a class="text link small">TBD@kou-works.com</a>
         <a href="mailto:2005mingkang@gmail.com" class="text link small">2005mingkang@gmail.com</a>
         <a href="#" class="text link small">VIMEO (TBD)</a>
@@ -100,7 +99,7 @@ onBeforeUnmount(() => clearInterval(clockInterval))
     </div>
 
     <div class="local-info" v-if="timeStr">
-      <span class="text">Los Angeles</span>
+      <span class="text small">Los Angeles</span>
       <span class="text small" v-if="weatherTemp !== null"
         >{{ weatherLabel }} {{ weatherTemp }}°C</span
       >
@@ -112,10 +111,45 @@ onBeforeUnmount(() => clearInterval(clockInterval))
 
 <style scoped>
 .home {
-  position: fixed;
-  inset: 0;
+  /* 1. Change from fixed to relative/min-height */
+  position: relative;
+  min-height: 100dvh; /* Use dvh to account for mobile browser bars */
+  width: 100%;
+
+  /* 2. Enable vertical scrolling and allow interaction */
+  overflow-y: auto;
+  pointer-events: auto; /* Crucial: 'none' stops scroll and clicks */
+
+  /* 3. Use Flexbox for vertical centering when there IS space */
+  display: flex;
+  align-items: center;
+
   z-index: 1;
-  overflow: hidden;
+  box-sizing: border-box;
+  padding: 4rem 0; /* Adds top/bottom padding so content doesn't hit edges when scrolling */
+}
+
+.left-col {
+  display: flex;
+  flex-direction: column;
+  gap: 1.4rem;
+  pointer-events: none;
+}
+
+.left-col > * {
+  /* Ensure children (links) are still clickable */
+  pointer-events: auto;
+}
+
+.local-info {
+  /* 5. Keep this pinned to the corner relative to the screen, 
+     not the scrolling content */
+  position: fixed;
+  right: 1.5rem;
+  bottom: 1.5rem;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
   pointer-events: none;
 }
 
@@ -169,13 +203,13 @@ onBeforeUnmount(() => clearInterval(clockInterval))
   pointer-events: none;
 }
 
-.circle {
+/* .circle {
   width: 1rem;
   height: 1rem;
   border-radius: 50%;
   background: #000;
   flex-shrink: 0;
-}
+} */
 
 .contact {
   display: flex;
@@ -185,7 +219,7 @@ onBeforeUnmount(() => clearInterval(clockInterval))
 .local-info {
   position: absolute;
   right: 1.5rem;
-  bottom: 1rem;
+  bottom: 1.5rem;
   display: flex;
   flex-direction: column;
   align-items: flex-end;

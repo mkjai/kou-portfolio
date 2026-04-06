@@ -65,7 +65,7 @@ onMounted(() => {
       // ---- Tile grid ----
       // Tile size relative to viewport height so it stays consistent on all screens.
       // 22 tiles across the height → circle ~70% of min(w,h) feels right with circleR=0.70
-      float gridCount = 40.0;
+      float gridCount = 38.0;
       float tileSize  = 1.0 / gridCount;
 
       // Circle radius in aspect-corrected space.
