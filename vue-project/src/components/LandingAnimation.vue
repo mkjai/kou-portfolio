@@ -29,7 +29,7 @@ onMounted(() => {
       pg.fill(0)
       pg.textAlign(p.CENTER, p.CENTER)
       pg.textStyle(p.BOLD)
-      pg.textSize(100)
+      pg.textSize(120)
 
       const tw = pg.textWidth('KOU')
       const ascent = pg.textAscent()
@@ -58,7 +58,7 @@ onMounted(() => {
 
     const generatePixels = () => {
       pixels = []
-      const spacing = 2.2
+      const spacing = 1.5
       for (let x = 0; x < p.width; x += spacing) {
         for (let y = 0; y < p.height; y += spacing) {
           const idx = (Math.floor(x) + Math.floor(y) * pg.width) * 4
@@ -66,7 +66,7 @@ onMounted(() => {
             pixels.push({
               nx: x / p.width,
               ny: y / p.height,
-              baseSize: p.random(1.5, 2.8),
+              baseSize: p.random(0.2, 1.0),
               stableRand: p.random(0, 1),
             })
           }
