@@ -7,10 +7,13 @@ const p5Container = ref(null)
 let myP5 = null
 let resizeObserver = null
 
-// These are set from inside the sketch so ResizeObserver can call them directly
 let _resize = null
 
-onMounted(() => {
+onMounted(async () => {
+  const font = new FontFace('KOU', 'url(/KOU.ttf)')
+  await font.load()
+  document.fonts.add(font)
+
   const sketch = (p) => {
     let pg
     let pixels = []
@@ -27,38 +30,39 @@ onMounted(() => {
       pg.pixelDensity(1)
       pg.background(255)
       pg.fill(0)
-      pg.textAlign(p.CENTER, p.CENTER)
-      pg.textStyle(p.BOLD)
-      pg.textSize(120)
+      pg.noStroke()
 
-      const tw = pg.textWidth('KOU')
-      const ascent = pg.textAscent()
-      const descent = pg.textDescent()
-      const th = ascent + descent
+      const ctx = pg.drawingContext
+      const fontSize = 120
+      ctx.font = `bold ${fontSize}px KOU`
+
+      // Measure using native canvas API so metrics match the actual font
+      const metrics = ctx.measureText('KOU')
+      const tw = metrics.width
+      const th = metrics.actualBoundingBoxAscent + metrics.actualBoundingBoxDescent
 
       const hScale = (p.width * 1.05) / tw
       const vScale = (p.height * 1.05) / th
 
-      // Use LEFT/TOP so we control exact position — CENTER alignment
-      // has inconsistent offsets when scaled non-uniformly
-      pg.textAlign(p.LEFT, p.TOP)
+      ctx.save()
+      ctx.scale(hScale, vScale)
 
-      // After scaling, rendered size = tw*hScale x th*vScale
-      // Offset so it's perfectly centered on both axes
-      const drawX = (p.width - tw * hScale) / 2
-      const drawY = (p.height - th * vScale) / 2
+      // In scaled space, center the text
+      const scaledW = p.width / hScale
+      const scaledH = p.height / vScale
+      const drawX = (scaledW - tw) / 2
+      const drawY = (scaledH - th) / 2 + metrics.actualBoundingBoxAscent
 
-      pg.push()
-      pg.translate(drawX, drawY)
-      pg.scale(hScale, vScale)
-      pg.text('KOU', 0, 0)
-      pg.pop()
+      ctx.fillStyle = '#000000'
+      ctx.fillText('KOU', drawX, drawY)
+      ctx.restore()
+
       pg.loadPixels()
     }
 
     const generatePixels = () => {
       pixels = []
-      const spacing = 1.5
+      const spacing = 3
       for (let x = 0; x < p.width; x += spacing) {
         for (let y = 0; y < p.height; y += spacing) {
           const idx = (Math.floor(x) + Math.floor(y) * pg.width) * 4
@@ -66,7 +70,7 @@ onMounted(() => {
             pixels.push({
               nx: x / p.width,
               ny: y / p.height,
-              baseSize: p.random(0.2, 1.0),
+              baseSize: p.random(0.1, 1.1),
               stableRand: p.random(0, 1),
             })
           }
@@ -74,7 +78,6 @@ onMounted(() => {
       }
     }
 
-    // Expose to outer scope so ResizeObserver can call it
     _resize = (w, h) => {
       p.resizeCanvas(w, h)
       createMask()
@@ -93,7 +96,7 @@ onMounted(() => {
       p.clear()
       sweepPos += sweepSpeed
       let anyVisible = false
-      const frameShimmer = p.frameCount * 0.035
+      const frameShimmer = p.frameCount * 0.1
 
       for (let i = 0; i < pixels.length; i++) {
         const px = pixels[i]
@@ -110,9 +113,9 @@ onMounted(() => {
         const targetIntensity = probIn - probOut
 
         if (targetIntensity > 0.01) {
-          const shine = p.sin(curDiag * 0.02 - frameShimmer)
-          const specular = p.pow(p.map(shine, -1, 1, 0, 1), 4)
-          if (px.stableRand < targetIntensity * (0.15 + specular * 0.85)) {
+          const shine = p.sin(curDiag * 0.01 - frameShimmer)
+          const specular = p.pow(p.map(shine, -1, 1, 0, 1), 1.9)
+          if (px.stableRand < targetIntensity * (0.05 + specular * 0.95)) {
             anyVisible = true
             p.noStroke()
             p.fill(0)
@@ -135,7 +138,6 @@ onMounted(() => {
 
   myP5 = new p5(sketch, p5Container.value)
 
-  // Instantly react to any container size change
   resizeObserver = new ResizeObserver((entries) => {
     const { width, height } = entries[0].contentRect
     if (_resize && width > 0 && height > 0) {
@@ -168,18 +170,12 @@ onBeforeUnmount(() => {
   justify-content: center;
 }
 
-/*
-  Control the canvas size here with CSS.
-  100vw / 100vh = full brutalist bleed.
-  You can also use e.g. 90vw / 80vh for breathing room.
-*/
 .p5-canvas {
   width: 100vw;
   height: 100vh;
-  padding-right: 0.5rem;
+  padding-left: 0.8rem;
 }
 
-/* Stretch the p5 <canvas> element to fill the container */
 .p5-canvas :deep(canvas) {
   display: block;
   width: 100% !important;
