@@ -35,7 +35,7 @@ onMounted(() => {
         // Varying alpha creates the "shuffling" noise effect
         const alpha = p.random(250, 255)
 
-        p.fill(0, alpha)
+        p.fill(255, alpha)
         p.rect(x, y, w, w)
       }
     }
@@ -59,10 +59,10 @@ onBeforeUnmount(() => {
         Home
       </RouterLink>
       <RouterLink to="/still" class="nav-link" :class="{ active: route.path === '/still' }">
-        Stills
+        Still
       </RouterLink>
       <RouterLink to="/motion" class="nav-link" :class="{ active: route.path === '/motion' }">
-        Motions
+        Motion
       </RouterLink>
     </div>
   </nav>
@@ -110,7 +110,7 @@ onBeforeUnmount(() => {
   font-weight: 400;
   letter-spacing: -0.01em;
   text-decoration: none;
-  color: #000;
+  color: #fff;
   line-height: 1;
   display: inline-block;
 }

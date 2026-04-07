@@ -79,6 +79,7 @@ const onLandingComplete = () => {
   inset: 0;
   z-index: 0;
   pointer-events: none;
+  isolation: isolate;
 }
 
 .nav-fade {
@@ -86,6 +87,9 @@ const onLandingComplete = () => {
   top: 0;
   right: 0;
   z-index: 100;
+  /* Blend against actual page pixels — must be on the fixed element itself,
+     not a child, otherwise it only blends inside its own transparent wrapper */
+  mix-blend-mode: difference;
 }
 
 .page-fade {

@@ -1,26 +1,7 @@
 <script setup>
-import { ref, onMounted, onBeforeUnmount } from 'vue'
+import { ref, computed, onMounted, onBeforeUnmount } from 'vue'
 
-// ─── Auto-load photos from src/assets/stills/ using Vite glob ───────────────
-//
-// FOLDER STRUCTURE:
-//   src/assets/stills/
-//     01_Show-Title_2026.04.06/
-//       001.jpg   ← becomes the cover (first alphabetically)
-//       002.jpg
-//       003.jpg
-//     02_Another-Show_2026.03.20/
-//       001.jpg
-//       002.jpg
-//
-// Folder name format: {order}_{Title}_{Date}
-//   - Use hyphens for spaces in title
-//   - {order} ensures display sort order
-//   - {Date} format is free-form (shown as-is)
-//
-// Photos inside each folder are sorted alphabetically — name them
-// 001, 002, 003... to control order. The first file becomes the cover.
-
+// ─── Auto-load ────────────────────────────────────────────────────────────────
 const allImages = import.meta.glob(
   '/src/assets/stills/**/*.{jpg,jpeg,png,webp,JPG,JPEG,PNG,WEBP}',
   { eager: true },
@@ -28,36 +9,23 @@ const allImages = import.meta.glob(
 
 function loadLives() {
   const folders = {}
-
   for (const path in allImages) {
-    const segments = path.split('/')
-    const filename = segments[segments.length - 1]
-    const folderName = segments[segments.length - 2]
+    const segs = path.split('/')
+    const filename = segs[segs.length - 1]
+    const folderName = segs[segs.length - 2]
     if (!folderName || folderName === 'stills') continue
-
     if (!folders[folderName]) folders[folderName] = []
-    folders[folderName].push({
-      filename,
-      url: allImages[path].default || allImages[path],
-    })
+    folders[folderName].push({ filename, url: allImages[path].default || allImages[path] })
   }
-
   return Object.entries(folders)
     .sort(([a], [b]) => a.localeCompare(b))
     .map(([folderName, photos]) => {
-      // Sort photos alphabetically so 001 comes first
       photos.sort((a, b) => a.filename.localeCompare(b.filename))
-
-      // Parse folder name: {order}_{Title}_{Date}
       const parts = folderName.split('_')
-      const title = (parts[1] || 'Untitled').replace(/-/g, ' ')
-      const date = parts[2] || ''
-
       return {
         id: folderName,
-        title,
-        date,
-        cover: photos[0].url,
+        title: (parts[1] || 'Untitled').replace(/-/g, ' '),
+        date: parts[2] || '',
         gallery: photos.map((p) => p.url),
       }
     })
@@ -65,252 +33,430 @@ function loadLives() {
 
 const lives = ref(loadLives())
 
-// ─── Lightbox ────────────────────────────────────────────────────────────────
+// ─── Lightbox ─────────────────────────────────────────────────────────────────
 const isLightboxOpen = ref(false)
 const currentLive = ref(null)
 const currentIndex = ref(0)
 
-const openLightbox = (live) => {
+const SLIDE_VW = 72
+const GAP_VW = 2
+const SLIDE_STEP = SLIDE_VW + GAP_VW
+const FRICTION = 0.93
+const SNAP_VEL = 0.04
+const VEL_SCALE = 0.016
+
+let position = 0,
+  velocity = 0,
+  rafId = null,
+  snapping = false
+const livePosition = ref(0)
+
+const stripOffsetVw = computed(() => -livePosition.value + (100 - SLIDE_VW) / 2)
+
+const openLightbox = (live, idx = 0) => {
   currentLive.value = live
-  currentIndex.value = 0
+  currentIndex.value = idx
+  position = idx * SLIDE_STEP
+  velocity = 0
+  livePosition.value = idx * SLIDE_STEP
+  snapping = false
   isLightboxOpen.value = true
   document.body.style.overflow = 'hidden'
+  startLoop()
 }
 const closeLightbox = () => {
   isLightboxOpen.value = false
   document.body.style.overflow = ''
+  stopLoop()
+  velocity = 0
 }
-const nextPhoto = () => {
-  if (currentIndex.value < currentLive.value.gallery.length - 1) currentIndex.value++
+
+function clampPosition(pos) {
+  const len = currentLive.value?.gallery.length ?? 1
+  return Math.max(0, Math.min((len - 1) * SLIDE_STEP, pos))
 }
-const prevPhoto = () => {
-  if (currentIndex.value > 0) currentIndex.value--
+function nearestSlide(pos) {
+  return Math.round(pos / SLIDE_STEP)
 }
-const handleScroll = (e) => {
-  if (!isLightboxOpen.value) return
-  e.deltaY > 0 ? nextPhoto() : prevPhoto()
-}
-onMounted(() => window.addEventListener('wheel', handleScroll))
-onBeforeUnmount(() => window.removeEventListener('wheel', handleScroll))
 
-// ─── Tile-displacement glitch effect ─────────────────────────────────────────
-//
-// KEY DESIGN:
-// - Canvas pixel size  = image natural size  (source-of-truth, never changes)
-// - Canvas CSS size    = display size (CSS scales it, like img with object-fit)
-// - Tile coordinates are always in image-natural space
-// - Mouse coords are scaled from display-px → image-natural-px
-// - For lightbox: image is letterboxed (contain), so we compute the
-//   letterbox rect and only interact with tiles inside it
+function loop() {
+  const len = currentLive.value?.gallery.length ?? 1
+  const maxPos = (len - 1) * SLIDE_STEP
 
-const COLS = 10
-const ROWS = 8
-const RADIUS = 90 // influence radius in IMAGE-space px (scaled per image)
-const MAX_DISP = 14 // max tile displacement in image-space px
-const LERP = 0.14
-
-const states = new Map()
-
-function buildState(canvasEl, imgEl, isCover) {
-  const iW = imgEl.naturalWidth
-  const iH = imgEl.naturalHeight
-  const tileW = iW / COLS
-  const tileH = iH / ROWS
-
-  const seeds = []
-  for (let i = 0; i < COLS * ROWS; i++) {
-    const angle = Math.random() * Math.PI * 2
-    seeds.push({ dx: Math.cos(angle), dy: Math.sin(angle) })
+  if (snapping) {
+    const target = currentIndex.value * SLIDE_STEP
+    const diff = target - position
+    position += diff * 0.12
+    velocity = 0
+    if (Math.abs(diff) < 0.02) {
+      position = target
+      snapping = false
+    }
+  } else {
+    position = clampPosition(position + velocity)
+    velocity *= FRICTION
+    if (Math.abs(velocity) < SNAP_VEL) {
+      velocity = 0
+      currentIndex.value = nearestSlide(position)
+      snapping = true
+    }
+    if (position <= 0 || position >= maxPos) velocity *= -0.1
   }
 
+  livePosition.value = position
+
+  rafId = requestAnimationFrame(loop)
+}
+function startLoop() {
+  if (!rafId) rafId = requestAnimationFrame(loop)
+}
+function stopLoop() {
+  if (rafId) cancelAnimationFrame(rafId)
+  rafId = null
+}
+function handleWheel(e) {
+  if (!isLightboxOpen.value) return
+  e.preventDefault()
+  velocity -= e.deltaY * VEL_SCALE
+  snapping = false
+  const maxVel = SLIDE_STEP * 0.4
+  velocity = Math.max(-maxVel, Math.min(maxVel, velocity))
+}
+
+// ─── Row canvas: composite ALL photos into ONE canvas seamlessly ──────────────
+const ROW_H = 180 // px — fixed row height
+const COLS = 10,
+  ROWS = 8,
+  RADIUS = 90,
+  MAX_DISP = 14,
+  LERP = 0.14
+const rowStates = new Map() // canvas → rowState
+
+function buildRowState(canvas, urls, imgs) {
+  const W = canvas.width,
+    H = canvas.height
+  const seeds = []
+  for (let i = 0; i < COLS * ROWS; i++) {
+    const a = Math.random() * Math.PI * 2
+    seeds.push({ dx: Math.cos(a), dy: Math.sin(a) })
+  }
   return {
-    canvasEl,
-    imgEl,
-    isCover,
-    iW,
-    iH,
-    tileW,
-    tileH,
+    canvas,
+    urls,
+    imgs,
+    W,
+    H,
+    tileW: W / COLS,
+    tileH: H / ROWS,
     seeds,
     disp: new Float32Array(COLS * ROWS * 2),
-    mouse: { x: -999999, y: -999999 }, // image-space coords
+    mouse: { x: -999999, y: -999999 },
+    frame: null,
+    active: false,
+    // per-photo slice widths (px) for click detection
+    sliceW: W / imgs.length,
+  }
+}
+
+function centerCrop(ctx, img, dx, dy, dw, dh) {
+  // Crops the center of img to fill dx,dy,dw,dh exactly (like object-fit:cover)
+  const iw = img.naturalWidth,
+    ih = img.naturalHeight
+  const sliceAspect = dw / dh
+  const imgAspect = iw / ih
+  let sx, sy, sw, sh
+  if (imgAspect > sliceAspect) {
+    sh = ih
+    sw = ih * sliceAspect
+    sx = (iw - sw) / 2
+    sy = 0
+  } else {
+    sw = iw
+    sh = iw / sliceAspect
+    sx = 0
+    sy = (ih - sh) / 2
+  }
+  ctx.drawImage(img, sx, sy, sw, sh, dx, dy, dw, dh)
+}
+
+function drawRowClean(state) {
+  const { canvas, imgs, W, H } = state
+  const ctx = canvas.getContext('2d')
+  const n = imgs.length
+  ctx.clearRect(0, 0, W, H)
+  imgs.forEach((img, i) => {
+    if (!img.complete || !img.naturalWidth) return
+    // Use Math.round for x and ceil for width to ensure slices tile seamlessly
+    const x = Math.round((i * W) / n)
+    const x2 = Math.round(((i + 1) * W) / n)
+    centerCrop(ctx, img, x, 0, x2 - x, H)
+  })
+}
+
+function drawRowFrame(state) {
+  const { canvas, imgs, W, H, tileW, tileH, seeds, disp, mouse } = state
+  const ctx = canvas.getContext('2d')
+  const radius = RADIUS // in canvas-px
+
+  let changed = false
+  for (let r = 0; r < ROWS; r++) {
+    for (let c = 0; c < COLS; c++) {
+      const i = r * COLS + c
+      const dist = Math.hypot(mouse.x - (c + 0.5) * tileW, mouse.y - (r + 0.5) * tileH)
+      const t = Math.max(0, 1 - dist / radius)
+      const str = t * t * MAX_DISP
+      const px = i * 2,
+        py = i * 2 + 1
+      disp[px] += (seeds[i].dx * str - disp[px]) * LERP
+      disp[py] += (seeds[i].dy * str - disp[py]) * LERP
+      if (Math.abs(disp[px]) > 0.15 || Math.abs(disp[py]) > 0.15) changed = true
+    }
+  }
+
+  // Draw the clean composite into an offscreen buffer first
+  const off = new OffscreenCanvas(W, H)
+  const octx = off.getContext('2d')
+  const sliceW = W / imgs.length
+  imgs.forEach((img, i) => {
+    if (!img.complete || !img.naturalWidth) return
+    centerCrop(octx, img, i * sliceW, 0, sliceW, H)
+  })
+
+  // Now tile-displace from the offscreen buffer onto main canvas
+  ctx.clearRect(0, 0, W, H)
+  for (let r = 0; r < ROWS; r++) {
+    for (let c = 0; c < COLS; c++) {
+      const i = r * COLS + c
+      const sx = c * tileW,
+        sy = r * tileH
+      ctx.save()
+      ctx.translate(disp[i * 2], disp[i * 2 + 1])
+      ctx.drawImage(off, sx, sy, tileW, tileH, sx, sy, tileW, tileH)
+      ctx.restore()
+    }
+  }
+
+  if (changed || state.active) state.frame = requestAnimationFrame(() => drawRowFrame(state))
+}
+
+const rowObservers = new Map()
+
+function mountRow(el) {
+  if (!el) return
+  const canvas = el.querySelector('canvas.row-canvas')
+  if (!canvas) return
+
+  const live = lives.value.find((l) => l.id === el.dataset.id)
+  if (!live) return
+
+  if (rowStates.has(canvas)) return
+
+  // Load all images first
+  const imgs = live.gallery.map((url) => {
+    const img = new Image()
+    img.crossOrigin = 'anonymous'
+    img.src = url
+    return img
+  })
+
+  // Use ResizeObserver so canvas dimensions always match actual rendered size
+  const initCanvas = (W) => {
+    // Canvas pixel size = exact CSS display px — no DPR scaling needed,
+    // the browser handles device pixel density via CSS
+    canvas.width = W
+    canvas.height = ROW_H
+
+    let state = rowStates.get(canvas)
+    if (state) {
+      // Update dimensions and redraw
+      state.W = W
+      state.H = ROW_H
+      state.tileW = W / COLS
+      state.tileH = ROW_H / ROWS
+      state.sliceW = W / imgs.length
+    } else {
+      state = buildRowState(canvas, live.gallery, imgs)
+      rowStates.set(canvas, state)
+    }
+
+    let loaded = 0
+    const tryDraw = () => {
+      loaded++
+      if (loaded >= imgs.length) drawRowClean(state)
+    }
+    imgs.forEach((img) => {
+      if (img.complete && img.naturalWidth > 0) tryDraw()
+      else img.addEventListener('load', tryDraw, { once: true })
+    })
+  }
+
+  const ro = new ResizeObserver((entries) => {
+    const W = Math.round(entries[0].contentRect.width)
+    if (W > 0) initCanvas(W)
+  })
+  ro.observe(el)
+  rowObservers.set(canvas, ro)
+}
+
+function rowEnter(e) {
+  const canvas = e.currentTarget.querySelector('canvas.row-canvas')
+  const state = canvas && rowStates.get(canvas)
+  if (!state) return
+  state.active = true
+  cancelAnimationFrame(state.frame)
+  drawRowFrame(state)
+}
+function rowLeave(e) {
+  const canvas = e.currentTarget.querySelector('canvas.row-canvas')
+  const state = canvas && rowStates.get(canvas)
+  if (!state) return
+  state.active = false
+  state.mouse = { x: -999999, y: -999999 }
+}
+function rowMove(e) {
+  const canvas = e.currentTarget.querySelector('canvas.row-canvas')
+  const state = canvas && rowStates.get(canvas)
+  if (!state) return
+  const rect = canvas.getBoundingClientRect()
+  const DPR = window.devicePixelRatio || 1
+  state.mouse = {
+    x: (e.clientX - rect.left) * DPR,
+    y: (e.clientY - rect.top) * DPR,
+  }
+}
+function rowClick(e, live) {
+  openLightbox(live, 0)
+}
+
+// ─── Lightbox slide canvases ──────────────────────────────────────────────────
+const slideStates = new Map()
+
+function buildSlideState(canvas, img) {
+  const iW = img.naturalWidth,
+    iH = img.naturalHeight
+  const seeds = []
+  for (let i = 0; i < COLS * ROWS; i++) {
+    const a = Math.random() * Math.PI * 2
+    seeds.push({ dx: Math.cos(a), dy: Math.sin(a) })
+  }
+  return {
+    canvas,
+    img,
+    iW,
+    iH,
+    tileW: iW / COLS,
+    tileH: iH / ROWS,
+    seeds,
+    disp: new Float32Array(COLS * ROWS * 2),
+    mouse: { x: -999999, y: -999999 },
     frame: null,
     active: false,
   }
 }
 
-// For lightbox: compute the letterbox rect (object-fit:contain) in image-space
-function letterboxRect(imgW, imgH, contW, contH) {
-  const scale = Math.min(contW / imgW, contH / imgH)
-  const dw = imgW * scale
-  const dh = imgH * scale
-  const ox = (contW - dw) / 2
-  const oy = (contH - dh) / 2
-  return { ox, oy, dw, dh, scale }
-}
-
-function drawFrame(state) {
-  const { canvasEl, imgEl, isCover, iW, iH, tileW, tileH, seeds, disp, mouse } = state
-  const ctx = canvasEl.getContext('2d')
-
-  // Compute influence radius scaled to image space
-  // For thumbnails radius is in image-px; for lightbox same
-  const radius = RADIUS * (iW / 220) // scale radius proportionally to image size
-
-  // Update displacements
+function drawSlideFrame(state) {
+  const { canvas, img, iW, iH, tileW, tileH, seeds, disp, mouse } = state
+  const ctx = canvas.getContext('2d')
+  const radius = RADIUS * (iW / 800)
   let changed = false
+
   for (let r = 0; r < ROWS; r++) {
     for (let c = 0; c < COLS; c++) {
       const i = r * COLS + c
-      const tileCX = (c + 0.5) * tileW
-      const tileCY = (r + 0.5) * tileH
-      const dist = Math.hypot(mouse.x - tileCX, mouse.y - tileCY)
+      const dist = Math.hypot(mouse.x - (c + 0.5) * tileW, mouse.y - (r + 0.5) * tileH)
       const t = Math.max(0, 1 - dist / radius)
-      const str = t * t * MAX_DISP * (iW / 220)
-
-      const tx = seeds[i].dx * str
-      const ty = seeds[i].dy * str
-      const px = i * 2
-      const py = i * 2 + 1
-      disp[px] += (tx - disp[px]) * LERP
-      disp[py] += (ty - disp[py]) * LERP
+      const str = t * t * MAX_DISP * (iW / 800)
+      const px = i * 2,
+        py = i * 2 + 1
+      disp[px] += (seeds[i].dx * str - disp[px]) * LERP
+      disp[py] += (seeds[i].dy * str - disp[py]) * LERP
       if (Math.abs(disp[px]) > 0.15 || Math.abs(disp[py]) > 0.15) changed = true
     }
   }
-
-  // Draw
   ctx.clearRect(0, 0, iW, iH)
-
-  if (isCover) {
-    // Thumbnail: fills canvas fully (object-fit: cover via CSS)
-    for (let r = 0; r < ROWS; r++) {
-      for (let c = 0; c < COLS; c++) {
-        const i = r * COLS + c
-        const sx = c * tileW
-        const sy = r * tileH
-        ctx.save()
-        ctx.translate(disp[i * 2], disp[i * 2 + 1])
-        ctx.drawImage(imgEl, sx, sy, tileW, tileH, sx, sy, tileW, tileH)
-        ctx.restore()
-      }
-    }
-  } else {
-    // Lightbox: letterboxed — draw black background then centered image
-    ctx.fillStyle = 'rgba(240,240,240,0.97)'
-    ctx.fillRect(0, 0, iW, iH)
-    // Just draw tiled — the canvas CSS handles scaling/centering
-    for (let r = 0; r < ROWS; r++) {
-      for (let c = 0; c < COLS; c++) {
-        const i = r * COLS + c
-        const sx = c * tileW
-        const sy = r * tileH
-        ctx.save()
-        ctx.translate(disp[i * 2], disp[i * 2 + 1])
-        ctx.drawImage(imgEl, sx, sy, tileW, tileH, sx, sy, tileW, tileH)
-        ctx.restore()
-      }
+  for (let r = 0; r < ROWS; r++) {
+    for (let c = 0; c < COLS; c++) {
+      const i = r * COLS + c
+      const sx = c * tileW,
+        sy = r * tileH
+      ctx.save()
+      ctx.translate(disp[i * 2], disp[i * 2 + 1])
+      ctx.drawImage(img, sx, sy, tileW, tileH, sx, sy, tileW, tileH)
+      ctx.restore()
     }
   }
-
-  if (changed || state.active) {
-    state.frame = requestAnimationFrame(() => drawFrame(state))
-  }
+  if (changed || state.active) state.frame = requestAnimationFrame(() => drawSlideFrame(state))
 }
 
-function setupCanvas(canvasEl, imgEl, isCover) {
-  const existing = states.get(canvasEl)
-  if (existing && existing.imgEl === imgEl) return
-
+function mountSlide(el) {
+  if (!el) return
+  const canvas = el.querySelector('canvas.tile-canvas')
+  const img = el.querySelector('img.src-img')
+  if (!canvas || !img) return
+  const existing = slideStates.get(canvas)
+  if (existing && existing.img === img) return
   if (existing) cancelAnimationFrame(existing.frame)
-
   const init = () => {
-    // Canvas pixel size = image natural size
-    canvasEl.width = imgEl.naturalWidth
-    canvasEl.height = imgEl.naturalHeight
-
-    const state = buildState(canvasEl, imgEl, isCover)
-    states.set(canvasEl, state)
-
-    // Draw initial clean image
-    const ctx = canvasEl.getContext('2d')
-    ctx.drawImage(imgEl, 0, 0)
+    canvas.width = img.naturalWidth
+    canvas.height = img.naturalHeight
+    const state = buildSlideState(canvas, img)
+    slideStates.set(canvas, state)
+    canvas.getContext('2d').drawImage(img, 0, 0)
   }
-
-  if (imgEl.complete && imgEl.naturalWidth > 0) init()
-  else imgEl.addEventListener('load', init, { once: true })
+  if (img.complete && img.naturalWidth > 0) init()
+  else img.addEventListener('load', init, { once: true })
 }
-
-function getMouseInImageSpace(e, canvasEl, state) {
-  const rect = canvasEl.getBoundingClientRect()
-  // scale from display-px to image-natural-px
-  const scaleX = state.iW / rect.width
-  const scaleY = state.iH / rect.height
-  return {
-    x: (e.clientX - rect.left) * scaleX,
-    y: (e.clientY - rect.top) * scaleY,
-  }
-}
-
-function onEnter(e) {
+function slideEnter(e) {
   const canvas = e.currentTarget.querySelector('canvas.tile-canvas')
-  const state = canvas && states.get(canvas)
+  const state = canvas && slideStates.get(canvas)
   if (!state) return
   state.active = true
   cancelAnimationFrame(state.frame)
-  drawFrame(state)
+  drawSlideFrame(state)
 }
-
-function onLeave(e) {
+function slideLeave(e) {
   const canvas = e.currentTarget.querySelector('canvas.tile-canvas')
-  const state = canvas && states.get(canvas)
+  const state = canvas && slideStates.get(canvas)
   if (!state) return
   state.active = false
   state.mouse = { x: -999999, y: -999999 }
 }
-
-function onMove(e) {
+function slideMove(e) {
   const canvas = e.currentTarget.querySelector('canvas.tile-canvas')
-  const state = canvas && states.get(canvas)
+  const state = canvas && slideStates.get(canvas)
   if (!state) return
-  state.mouse = getMouseInImageSpace(e, canvas, state)
+  const rect = canvas.getBoundingClientRect()
+  state.mouse = {
+    x: (e.clientX - rect.left) * (state.iW / rect.width),
+    y: (e.clientY - rect.top) * (state.iH / rect.height),
+  }
 }
 
-function mountGrid(el) {
-  if (!el) return
-  const canvas = el.querySelector('canvas.tile-canvas')
-  const img = el.querySelector('img.src-img')
-  if (canvas && img) setupCanvas(canvas, img, true)
-}
-
-function mountLightbox(el) {
-  if (!el) return
-  const canvas = el.querySelector('canvas.tile-canvas')
-  const img = el.querySelector('img.src-img')
-  if (canvas && img) setupCanvas(canvas, img, false)
-}
+onMounted(() => window.addEventListener('wheel', handleWheel, { passive: false }))
+onBeforeUnmount(() => {
+  window.removeEventListener('wheel', handleWheel)
+  stopLoop()
+  rowObservers.forEach((ro) => ro.disconnect())
+})
 </script>
 
 <template>
   <div class="still-container">
-    <!-- Grid -->
-    <div v-show="!isLightboxOpen" class="grid">
+    <!-- Sections: one row per live -->
+    <div v-show="!isLightboxOpen" class="sections">
       <div
         v-for="live in lives"
         :key="live.id"
-        class="live-item"
-        :ref="mountGrid"
-        @click="openLightbox(live)"
-        @mouseenter="onEnter"
-        @mouseleave="onLeave"
-        @mousemove="onMove"
+        class="live-section"
+        :data-id="live.id"
+        :ref="mountRow"
+        @click="rowClick($event, live)"
       >
-        <div class="image-wrapper">
-          <img :src="live.cover" :alt="live.name" class="src-img" crossorigin="anonymous" />
-          <canvas class="tile-canvas cover-canvas"></canvas>
-        </div>
-        <div class="live-details">
-          <p class="text title">{{ live.title }}</p>
-          <p class="text date">{{ live.date }}</p>
+        <!-- Single canvas compositing all photos seamlessly -->
+        <canvas class="row-canvas"></canvas>
+
+        <div class="section-header">
+          <span class="text title">{{ live.title }}, {{ live.date }}</span>
         </div>
       </div>
     </div>
@@ -318,15 +464,22 @@ function mountLightbox(el) {
     <!-- Lightbox -->
     <Transition name="fade">
       <div v-if="isLightboxOpen" class="lightbox" @click.self="closeLightbox">
-        <div
-          class="photo-stage"
-          :ref="mountLightbox"
-          @mouseenter="onEnter"
-          @mouseleave="onLeave"
-          @mousemove="onMove"
-        >
-          <img :src="currentLive.gallery[currentIndex]" class="src-img" crossorigin="anonymous" />
-          <canvas class="tile-canvas contain-canvas"></canvas>
+        <div class="carousel-viewport">
+          <div class="carousel-strip" :style="{ transform: `translateX(${stripOffsetVw}vw)` }">
+            <div
+              v-for="(url, idx) in currentLive.gallery"
+              :key="url"
+              class="slide"
+              :class="{ 'slide--active': idx === currentIndex }"
+              :ref="mountSlide"
+              @mouseenter="slideEnter"
+              @mouseleave="slideLeave"
+              @mousemove="slideMove"
+            >
+              <img :src="url" class="src-img" crossorigin="anonymous" />
+              <canvas class="tile-canvas contain-canvas"></canvas>
+            </div>
+          </div>
         </div>
 
         <div class="lightbox-meta">
@@ -343,74 +496,39 @@ function mountLightbox(el) {
 
 <style scoped>
 .still-container {
-  padding: 8rem 3rem 4rem 3rem;
+  padding: 8rem 1.5rem 4rem 1.5rem;
   min-height: 100dvh;
   box-sizing: border-box;
 }
 
-.grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, 220px);
-  gap: 0.4rem;
-}
-
-.live-item {
-  width: 220px;
-  cursor: pointer;
+.sections {
   display: flex;
   flex-direction: column;
+  gap: 2rem;
 }
 
-.image-wrapper {
-  width: 220px;
-  height: 147px;
-  overflow: hidden;
-  position: relative;
-}
-
-.src-img {
-  position: absolute;
-  opacity: 0;
-  pointer-events: none;
+.live-section {
+  cursor: pointer;
   width: 100%;
-  height: 100%;
-  object-fit: cover;
 }
 
-/* cover-canvas: fills its 220×147 container, canvas content fills whole image */
-.cover-canvas {
-  position: absolute;
-  inset: 0;
-  width: 100%;
-  height: 100%;
+/* Single canvas fills full width, fixed height */
+.row-canvas {
   display: block;
-  object-fit: cover;
-}
-
-/* contain-canvas: preserves aspect ratio, letterboxes within photo-stage */
-.contain-canvas {
-  position: absolute;
-  inset: 0;
   width: 100%;
-  height: 100%;
-  display: block;
-  object-fit: contain;
+  height: 180px;
 }
 
-.live-details {
-  margin-top: 0.4rem;
-  opacity: 0;
-  transition: opacity 0.2s ease;
-}
-.live-item:hover .live-details {
-  opacity: 1;
-}
-
-.meta-row {
+.section-header {
   display: flex;
   align-items: baseline;
-  gap: 0.3rem;
-  flex-wrap: wrap;
+  gap: 0.4rem;
+  margin-top: 0.3rem;
+}
+
+.sep {
+  font-size: 0.72rem;
+  opacity: 0.35;
 }
 
 .text {
@@ -419,18 +537,8 @@ function mountLightbox(el) {
   margin: 0;
   line-height: 1.3;
 }
-.artist {
+.title {
   font-size: 0.8rem;
-  font-weight: 700;
-  text-transform: uppercase;
-}
-.sep {
-  font-size: 0.8rem;
-  opacity: 0.4;
-}
-.name {
-  font-size: 0.8rem;
-  opacity: 0.7;
 }
 .date {
   font-size: 0.72rem;
@@ -439,54 +547,85 @@ function mountLightbox(el) {
 .small {
   font-size: 0.8rem;
 }
-.muted {
+/* .muted {
   opacity: 0.5;
-}
+} */
 
 /* Lightbox */
 .lightbox {
   position: fixed;
   inset: 0;
   z-index: 2000;
-  background: rgba(240, 240, 240, 0.97);
+  background: #fff;
   display: flex;
   align-items: center;
   justify-content: center;
-}
-
-.photo-stage {
-  position: relative;
-  /* 
-    Use max-width/max-height with auto on the other axis so the stage
-    itself never distorts the image. The canvas inside uses object-fit:contain.
-  */
-  max-width: 88vw;
-  max-height: 88vh;
-  width: 88vw;
-  height: 88vh;
   overflow: hidden;
-  cursor: crosshair;
 }
-
+.carousel-viewport {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  overflow: hidden;
+}
+.carousel-strip {
+  display: flex;
+  gap: 2vw;
+  align-items: center;
+  will-change: transform;
+}
+.slide {
+  flex-shrink: 0;
+  width: 72vw;
+  height: 78vh;
+  position: relative;
+  cursor: crosshair;
+  opacity: 0.3;
+  transform: scale(0.88);
+  transition:
+    opacity 0.35s ease,
+    transform 0.35s ease;
+}
+.slide--active {
+  opacity: 1;
+  transform: scale(1);
+}
+.slide .src-img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  opacity: 0;
+  pointer-events: none;
+}
+.contain-canvas {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
 .lightbox-meta {
   position: absolute;
   bottom: 2rem;
   left: 3rem;
   display: flex;
   flex-direction: column;
+  z-index: 10;
 }
-
 .close-btn {
   position: absolute;
   bottom: 2rem;
   right: 3rem;
   cursor: pointer;
   font-size: 1rem;
+  z-index: 10;
 }
 .close-btn:hover {
   text-decoration: line-through;
 }
-
 .fade-enter-active,
 .fade-leave-active {
   transition: opacity 0.3s ease;
