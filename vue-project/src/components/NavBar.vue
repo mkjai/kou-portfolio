@@ -129,8 +129,8 @@ onBeforeUnmount(() => {
     gap: 1.25rem;
   }
   .p5-logo-container {
-    width: 3rem;
-    height: 3rem;
+    width: 6rem;
+    height: 6rem;
   }
 }
 </style>
