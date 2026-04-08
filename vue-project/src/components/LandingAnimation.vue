@@ -173,7 +173,7 @@ onBeforeUnmount(() => {
 .p5-canvas {
   width: 100vw;
   height: 100vh;
-  padding-left: 0.5rem;
+  padding-left: 1rem;
 }
 
 .p5-canvas :deep(canvas) {
