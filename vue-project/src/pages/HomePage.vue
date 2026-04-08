@@ -193,7 +193,7 @@ onBeforeUnmount(() => clearInterval(clockInterval))
 
 .left-col {
   position: absolute;
-  left: 3rem;
+  left: 1.5rem;
   top: 50%;
   transform: translateY(-50%);
   display: flex;
