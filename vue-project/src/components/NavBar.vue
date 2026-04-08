@@ -121,12 +121,16 @@ onBeforeUnmount(() => {
   text-decoration-thickness: 1px;
 }
 
-@media (max-width: 1320px) {
+@media (max-width: 1440px) {
   .nav-link {
-    font-size: 2rem;
+    font-size: 1.5rem;
   }
   .nav-links-container {
     gap: 1.25rem;
+  }
+  .p5-logo-container {
+    width: 64px;
+    height: 64px;
   }
 }
 </style>

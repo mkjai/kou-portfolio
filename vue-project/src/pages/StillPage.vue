@@ -671,18 +671,18 @@ onBeforeUnmount(() => {
   opacity: 0;
 }
 
-@media (max-width: 1320px) {
+@media (max-width: 1440px) {
   .text {
-    font-size: 2rem;
+    font-size: 1.5rem;
   }
   .title {
-    font-size: 2rem;
+    font-size: 1.5rem;
   }
   .small {
-    font-size: 2rem;
+    font-size: 1.5rem;
   }
   .close-btn {
-    font-size: 2rem;
+    font-size: 1.5rem;
   }
 }
 </style>

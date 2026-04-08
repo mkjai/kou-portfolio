@@ -158,9 +158,9 @@ function embedUrl(video) {
   opacity: 0.45;
 }
 
-@media (max-width: 1320px) {
+@media (max-width: 1440px) {
   .title {
-    font-size: 2rem;
+    font-size: 1.5rem;
   }
 }
 </style>

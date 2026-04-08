@@ -89,11 +89,9 @@ onBeforeUnmount(() => clearInterval(clockInterval))
       <div class="contact">
         <p class="text small">Contact</p>
         <br />
-        <a
-          href="/cdn-cgi/l/email-protection#d4bcb1b8b8bb94bfbba1f9a3bba6bfa7fabdbab2bb"
-          class="text link small"
+        <a href="mailto:hello@kou-works.info" class="text link small"
           ><span class="__cf_email__" data-cfemail="d1b9b4bdbdbe91babea4fca6bea3baa2ffb8bfb7be"
-            >[email&#160;protected]</span
+            >hello@kou-works.info</span
           ></a
         >
         <a href="#" class="text link small">VIMEO (TBD)</a>
@@ -231,12 +229,12 @@ onBeforeUnmount(() => clearInterval(clockInterval))
   pointer-events: none;
 }
 
-@media (max-width: 1320px) {
+@media (max-width: 1440px) {
   .text {
-    font-size: 2rem;
+    font-size: 1.5rem;
   }
   .text.small {
-    font-size: 2rem;
+    font-size: 1.5rem;
   }
 }
 </style>
