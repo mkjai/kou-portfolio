@@ -128,9 +128,5 @@ onBeforeUnmount(() => {
   .nav-links-container {
     gap: 1.25rem;
   }
-  .p5-logo-container {
-    width: 6rem;
-    height: 6rem;
-  }
 }
 </style>
