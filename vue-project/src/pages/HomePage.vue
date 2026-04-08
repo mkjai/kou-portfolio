@@ -89,7 +89,7 @@ onBeforeUnmount(() => clearInterval(clockInterval))
       <div class="contact">
         <p class="text small">Contact</p>
         <br />
-        <a href="mailto:hello@kou-works.com" class="text link small">hello@kou-works.com</a>
+        <a href="mailto:hello@kou-works.info" class="text link small">hello@kou-works.info</a>
         <a href="#" class="text link small">VIMEO (TBD)</a>
         <a href="https://www.instagram.com/kou._.works/" target="_blank" class="text link small"
           >Instagram</a
