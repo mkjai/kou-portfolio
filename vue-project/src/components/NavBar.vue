@@ -120,4 +120,13 @@ onBeforeUnmount(() => {
   text-decoration: line-through;
   text-decoration-thickness: 1px;
 }
+
+@media (max-width: 768px) {
+  .nav-link {
+    font-size: 3rem;
+  }
+  .nav-links-container {
+    gap: 1.25rem;
+  }
+}
 </style>

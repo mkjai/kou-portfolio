@@ -123,6 +123,31 @@ function handleWheel(e) {
   velocity = Math.max(-maxVel, Math.min(maxVel, velocity))
 }
 
+// ─── Touch support for mobile lightbox ───────────────────────────────────────
+let touchStartX = 0
+
+function handleTouchStart(e) {
+  touchStartX = e.touches[0].clientX
+  velocity = 0
+  snapping = false
+  startLoop()
+}
+function handleTouchMove(e) {
+  e.preventDefault()
+}
+function handleTouchEnd(e) {
+  const delta = touchStartX - e.changedTouches[0].clientX
+  const threshold = 40 // px — any swipe longer than this snaps to next/prev
+
+  const len = currentLive.value?.gallery.length ?? 1
+  if (delta > threshold && currentIndex.value < len - 1) {
+    currentIndex.value++
+  } else if (delta < -threshold && currentIndex.value > 0) {
+    currentIndex.value--
+  }
+  snapping = true
+}
+
 // ─── Row canvas: composite ALL photos into ONE canvas seamlessly ──────────────
 const ROW_H = 180 // px — fixed row height
 const COLS = 10,
@@ -432,7 +457,9 @@ function slideMove(e) {
   }
 }
 
-onMounted(() => window.addEventListener('wheel', handleWheel, { passive: false }))
+onMounted(() => {
+  window.addEventListener('wheel', handleWheel, { passive: false })
+})
 onBeforeUnmount(() => {
   window.removeEventListener('wheel', handleWheel)
   stopLoop()
@@ -463,7 +490,14 @@ onBeforeUnmount(() => {
 
     <!-- Lightbox -->
     <Transition name="fade">
-      <div v-if="isLightboxOpen" class="lightbox" @click.self="closeLightbox">
+      <div
+        v-if="isLightboxOpen"
+        class="lightbox"
+        @click.self="closeLightbox"
+        @touchstart.passive="handleTouchStart"
+        @touchmove.prevent="handleTouchMove"
+        @touchend.passive="handleTouchEnd"
+      >
         <div class="carousel-viewport">
           <div class="carousel-strip" :style="{ transform: `translateX(${stripOffsetVw}vw)` }">
             <div
@@ -561,6 +595,8 @@ onBeforeUnmount(() => {
   align-items: center;
   justify-content: center;
   overflow: hidden;
+  /* Prevents iOS from intercepting horizontal swipes */
+  touch-action: none;
 }
 .carousel-viewport {
   position: absolute;
@@ -610,7 +646,7 @@ onBeforeUnmount(() => {
 .lightbox-meta {
   position: absolute;
   bottom: 2rem;
-  left: 3rem;
+  left: 1.5rem;
   display: flex;
   flex-direction: column;
   z-index: 10;
@@ -618,7 +654,7 @@ onBeforeUnmount(() => {
 .close-btn {
   position: absolute;
   bottom: 2rem;
-  right: 3rem;
+  right: 1.5rem;
   cursor: pointer;
   font-size: 1rem;
   z-index: 10;
@@ -633,5 +669,20 @@ onBeforeUnmount(() => {
 .fade-enter-from,
 .fade-leave-to {
   opacity: 0;
+}
+
+@media (max-width: 768px) {
+  .text {
+    font-size: 3rem;
+  }
+  .title {
+    font-size: 3rem;
+  }
+  .small {
+    font-size: 3rem;
+  }
+  .close-btn {
+    font-size: 3rem;
+  }
 }
 </style>

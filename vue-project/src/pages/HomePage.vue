@@ -89,7 +89,13 @@ onBeforeUnmount(() => clearInterval(clockInterval))
       <div class="contact">
         <p class="text small">Contact</p>
         <br />
-        <a href="mailto:hello@kou-works.info" class="text link small">hello@kou-works.info</a>
+        <a
+          href="/cdn-cgi/l/email-protection#d4bcb1b8b8bb94bfbba1f9a3bba6bfa7fabdbab2bb"
+          class="text link small"
+          ><span class="__cf_email__" data-cfemail="d1b9b4bdbdbe91babea4fca6bea3baa2ffb8bfb7be"
+            >[email&#160;protected]</span
+          ></a
+        >
         <a href="#" class="text link small">VIMEO (TBD)</a>
         <a href="https://www.instagram.com/kou._.works/" target="_blank" class="text link small"
           >Instagram</a
@@ -216,11 +222,21 @@ onBeforeUnmount(() => clearInterval(clockInterval))
 }
 
 .local-info {
-  position: absolute;
+  position: fixed;
   right: 1.5rem;
   bottom: 1.5rem;
   display: flex;
   flex-direction: column;
   align-items: flex-end;
+  pointer-events: none;
+}
+
+@media (max-width: 768px) {
+  .text {
+    font-size: 3rem;
+  }
+  .text.small {
+    font-size: 3rem;
+  }
 }
 </style>
