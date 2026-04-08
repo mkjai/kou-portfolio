@@ -105,6 +105,5 @@ body {
   padding: 0;
   background: #fff;
   width: 100%;
-  height: 100%;
 }
 </style>
