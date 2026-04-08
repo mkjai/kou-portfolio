@@ -9,7 +9,7 @@ let logoP5 = null
 
 onMounted(() => {
   const sketch = (p) => {
-    const size = window.innerWidth >= 1440 ? 56 : 32
+    const size = window.innerWidth >= 1440 ? 80 : 32
 
     p.setup = () => {
       p.createCanvas(size, size)
@@ -134,8 +134,8 @@ onBeforeUnmount(() => {
     gap: 1.25rem;
   }
   .p5-logo-container {
-    width: 56px;
-    height: 56px;
+    width: 80px;
+    height: 80px;
   }
 }
 </style>
