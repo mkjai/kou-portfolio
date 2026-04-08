@@ -9,12 +9,11 @@ let logoP5 = null
 
 onMounted(() => {
   const sketch = (p) => {
-    const size = 32 // Size of the square logo
+    const size = window.innerWidth >= 1440 ? 56 : 32
 
     p.setup = () => {
       p.createCanvas(size, size)
       p.noStroke()
-      // We keep the frameRate high for active, energetic grain movement
       p.frameRate(30)
       p.pixelDensity(1)
     }
@@ -93,8 +92,14 @@ onBeforeUnmount(() => {
   width: 32px;
   height: 32px;
   display: block;
-  /* Optional: Ensures the square edges look sharp against the background */
   background-color: transparent;
+}
+
+@media (min-width: 1440px) {
+  .p5-logo-container {
+    width: 56px;
+    height: 56px;
+  }
 }
 
 .nav-links-container {
