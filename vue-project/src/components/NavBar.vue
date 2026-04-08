@@ -8,30 +8,31 @@ const logoContainer = ref(null)
 let logoP5 = null
 
 onMounted(() => {
-  // Read the size CSS has already set on the container — JS always matches CSS
-  const size = logoContainer.value.offsetWidth || 32
+  requestAnimationFrame(() => {
+    const size = logoContainer.value?.offsetWidth || 32
 
-  const sketch = (p) => {
-    p.setup = () => {
-      p.createCanvas(size, size)
-      p.noStroke()
-      p.frameRate(30)
-      p.pixelDensity(1)
-    }
+    const sketch = (p) => {
+      p.setup = () => {
+        p.createCanvas(size, size)
+        p.noStroke()
+        p.frameRate(30)
+        p.pixelDensity(1)
+      }
 
-    p.draw = () => {
-      p.clear()
-      for (let i = 0; i < 700; i++) {
-        const x = p.random(0, size)
-        const y = p.random(0, size)
-        const w = p.random(0.5, 1.5)
-        const alpha = p.random(250, 255)
-        p.fill(255, alpha)
-        p.rect(x, y, w, w)
+      p.draw = () => {
+        p.clear()
+        for (let i = 0; i < 700; i++) {
+          const x = p.random(0, size)
+          const y = p.random(0, size)
+          const w = p.random(0.5, 1.5)
+          const alpha = p.random(250, 255)
+          p.fill(255, alpha)
+          p.rect(x, y, w, w)
+        }
       }
     }
-  }
-  logoP5 = new p5(sketch, logoContainer.value)
+    logoP5 = new p5(sketch, logoContainer.value)
+  })
 })
 
 onBeforeUnmount(() => {
@@ -90,8 +91,8 @@ onBeforeUnmount(() => {
 /* Large desktop */
 @media (min-width: 1440px) {
   .p5-logo-container {
-    width: 56px;
-    height: 56px;
+    width: 64px;
+    height: 64px;
   }
 }
 
@@ -121,7 +122,7 @@ onBeforeUnmount(() => {
 
 @media (max-width: 1440px) {
   .nav-link {
-    font-size: 1.5rem;
+    font-size: 1.75rem;
   }
   .nav-links-container {
     gap: 1.25rem;
