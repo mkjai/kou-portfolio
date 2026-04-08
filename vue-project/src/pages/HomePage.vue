@@ -233,10 +233,10 @@ onBeforeUnmount(() => clearInterval(clockInterval))
 
 @media (max-width: 768px) {
   .text {
-    font-size: 3rem;
+    font-size: 5rem;
   }
   .text.small {
-    font-size: 3rem;
+    font-size: 5rem;
   }
 }
 </style>

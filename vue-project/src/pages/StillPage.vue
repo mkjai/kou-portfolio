@@ -530,7 +530,7 @@ onBeforeUnmount(() => {
 
 <style scoped>
 .still-container {
-  padding: 8rem 1.5rem 4rem 1.5rem;
+  padding: 8rem 1.5rem 2rem 1.5rem;
   min-height: 100dvh;
   box-sizing: border-box;
 }
@@ -673,16 +673,16 @@ onBeforeUnmount(() => {
 
 @media (max-width: 768px) {
   .text {
-    font-size: 3rem;
+    font-size: 5rem;
   }
   .title {
-    font-size: 3rem;
+    font-size: 5rem;
   }
   .small {
-    font-size: 3rem;
+    font-size: 5rem;
   }
   .close-btn {
-    font-size: 3rem;
+    font-size: 5rem;
   }
 }
 </style>

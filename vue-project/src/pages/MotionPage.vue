@@ -119,7 +119,7 @@ function embedUrl(video) {
 .video-wrapper {
   position: relative;
   width: 100%;
-  padding-bottom: 56.25%;
+  padding-bottom: 2rem;
   background: #111;
 }
 
@@ -160,7 +160,7 @@ function embedUrl(video) {
 
 @media (max-width: 768px) {
   .title {
-    font-size: 1.5rem;
+    font-size: 5rem;
   }
 }
 </style>

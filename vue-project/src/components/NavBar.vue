@@ -123,7 +123,7 @@ onBeforeUnmount(() => {
 
 @media (max-width: 768px) {
   .nav-link {
-    font-size: 3rem;
+    font-size: 5rem;
   }
   .nav-links-container {
     gap: 1.25rem;
