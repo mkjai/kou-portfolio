@@ -89,7 +89,7 @@ onBeforeUnmount(() => {
 }
 
 /* Large desktop */
-@media (min-width: 1440px) {
+@media (max-width: 1440px) {
   .p5-logo-container {
     width: 64px;
     height: 64px;
