@@ -538,7 +538,7 @@ onBeforeUnmount(() => {
 .sections {
   display: flex;
   flex-direction: column;
-  gap: 2rem;
+  gap: 1rem;
 }
 
 .live-section {
@@ -671,18 +671,18 @@ onBeforeUnmount(() => {
   opacity: 0;
 }
 
-@media (max-width: 768px) {
+@media (max-width: 1320px) {
   .text {
-    font-size: 5rem;
+    font-size: 2rem;
   }
   .title {
-    font-size: 5rem;
+    font-size: 2rem;
   }
   .small {
-    font-size: 5rem;
+    font-size: 2rem;
   }
   .close-btn {
-    font-size: 5rem;
+    font-size: 2rem;
   }
 }
 </style>

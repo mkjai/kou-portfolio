@@ -121,9 +121,9 @@ onBeforeUnmount(() => {
   text-decoration-thickness: 1px;
 }
 
-@media (max-width: 768px) {
+@media (max-width: 1320px) {
   .nav-link {
-    font-size: 5rem;
+    font-size: 2rem;
   }
   .nav-links-container {
     gap: 1.25rem;

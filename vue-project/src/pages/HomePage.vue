@@ -231,12 +231,12 @@ onBeforeUnmount(() => clearInterval(clockInterval))
   pointer-events: none;
 }
 
-@media (max-width: 768px) {
+@media (max-width: 1320px) {
   .text {
-    font-size: 5rem;
+    font-size: 2rem;
   }
   .text.small {
-    font-size: 5rem;
+    font-size: 2rem;
   }
 }
 </style>
