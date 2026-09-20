@@ -18,7 +18,7 @@ function loadLives() {
     folders[folderName].push({ filename, url: allImages[path].default || allImages[path] })
   }
   return Object.entries(folders)
-    .sort(([a], [b]) => a.localeCompare(b))
+    .sort(([a], [b]) => b.localeCompare(a))
     .map(([folderName, photos]) => {
       photos.sort((a, b) => a.filename.localeCompare(b.filename))
       const parts = folderName.split('_')
